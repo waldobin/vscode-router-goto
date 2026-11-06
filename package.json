@@ -1,0 +1,118 @@
+{
+  "name": "vscode-router-goto",
+  "displayName": "React Navigation & Expo Router IntelliSense",
+  "description": "Smart autocomplete, Click-to-Definition (Cmd+click) and hover documentation for Expo Router & React Navigation screens and params.",
+  "version": "0.2.0",
+  "publisher": "waldoxbin",
+  "icon": "assets/icon.png",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Other"
+  ],
+  "keywords": [
+    "react-native",
+    "expo",
+    "expo-router",
+    "react-navigation",
+    "navigation",
+    "autocomplete",
+    "go to definition",
+    "router-goto",
+    "intellisense"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/waldobin/vscode-router-goto"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "routerGoto.rescan",
+        "title": "Router Goto: Rescan Navigation Routes & ParamLists",
+        "category": "Router Goto"
+      },
+      {
+        "command": "routerGoto.showRegisteredRoutes",
+        "title": "Router Goto: Show All Registered Routes",
+        "category": "Router Goto"
+      }
+    ],
+    "configuration": {
+      "title": "React Navigation & Expo Router IntelliSense",
+      "properties": {
+        "routerGoto.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable Router Goto extension features."
+        },
+        "routerGoto.enableExpoRouter": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Expo Router scanning, autocomplete, and navigation."
+        },
+        "routerGoto.enableReactNavigation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable React Navigation scanning (ParamList & Stack.Screen), autocomplete, and navigation."
+        },
+        "routerGoto.appDirectories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "app",
+            "src/app"
+          ],
+          "description": "Directories to scan for Expo Router routes."
+        },
+        "routerGoto.preferComponentDefinition": {
+          "type": "boolean",
+          "default": true,
+          "description": "When jumping to definition in React Navigation, jump directly to the Screen Component file if available, rather than the ParamList type declaration."
+        },
+        "routerGoto.enableHover": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show rich route information & parameter details on hover."
+        },
+        "routerGoto.enableDocumentLinks": {
+          "type": "boolean",
+          "default": true,
+          "description": "Turn route strings into direct clickable links (Cmd/Ctrl + Click)."
+        },
+        "routerGoto.enableDiagnostics": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show warning squiggles for route strings that do not match any known route in the workspace."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node ./build.js --production",
+    "watch": "node ./build.js --watch",
+    "test": "vitest run",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "@types/vscode": "^1.80.0",
+    "@vscode/vsce": "^4.1.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.7"
+  }
+}
