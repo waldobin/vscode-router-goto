@@ -6,13 +6,13 @@ export interface RouteMatchInfo {
   memberOnly?: string;
   range: vscode.Range;
   isExpoLike: boolean;
-  frameworkHint?: 'expo-router' | 'react-navigation';
+  frameworkHint?: 'expo-router' | 'react-navigation' | 'react-router';
   isMethodClick?: boolean;
 }
 
 export interface CompletionContextInfo {
   type: 'route-name' | 'param-key';
-  frameworkHint?: 'expo-router' | 'react-navigation';
+  frameworkHint?: 'expo-router' | 'react-navigation' | 'react-router';
   currentRouteName?: string;
   range: vscode.Range;
 }
@@ -145,7 +145,9 @@ export class AstHelper {
     const isNav =
       exprText.includes('.navigate') ||
       exprText.includes('.push') ||
-      exprText.includes('.replace');
+      exprText.includes('.replace') ||
+      exprText === 'navigate' ||
+      exprText === 'redirect';
 
     if (!isNav) {
       return false;
@@ -153,7 +155,13 @@ export class AstHelper {
 
     // Check if cursor is on or near the method identifier
     const cursorText = cursorNode.getText(sourceFile);
-    if (cursorText === 'navigate' || cursorText === 'push' || cursorText === 'replace' || cursorText === 'navigation') {
+    if (
+      cursorText === 'navigate' ||
+      cursorText === 'push' ||
+      cursorText === 'replace' ||
+      cursorText === 'navigation' ||
+      cursorText === 'redirect'
+    ) {
       return true;
     }
 
@@ -280,6 +288,88 @@ export class AstHelper {
   }
 
   /**
+   * Helper to retrieve preceding text in the document before a given position,
+   * looking backwards across previous lines.
+   */
+  public static getPrecedingText(
+    document: vscode.TextDocument,
+    lineNumber: number,
+    charIndex: number,
+    maxLookbackLines: number = 10
+  ): string {
+    const currentLine = document.lineAt(lineNumber).text.substring(0, charIndex);
+    const startLine = Math.max(0, lineNumber - maxLookbackLines);
+    const lines: string[] = [];
+    for (let i = startLine; i < lineNumber; i++) {
+      lines.push(document.lineAt(i).text);
+    }
+    lines.push(currentLine);
+    return lines.join('\n');
+  }
+
+  /**
+   * Detect if the text preceding a string literal indicates a navigation context.
+   */
+  public static detectNavigationContext(text: string): {
+    isNav: boolean;
+    frameworkHint?: 'expo-router' | 'react-navigation' | 'react-router';
+  } {
+    // Strip comments and trailing whitespace
+    const clean = text
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '')
+      .trimEnd();
+
+    // 1. Expo Router object pathname: pathname: "..." or pathname: \n "..."
+    if (/pathname\s*:\s*$/.test(clean)) {
+      return { isNav: true, frameworkHint: 'expo-router' };
+    }
+
+    // 2. Direct navigation call: router.navigate(...), navigation.push(...), or bare navigate(...)
+    const navCallMatch = /(?:(?:\bnavigation|\brouter)\s*\.\s*(?:navigate|push|replace)|\bnavigate|\bredirect)\s*\(\s*$/.exec(clean);
+    if (navCallMatch) {
+      let hint: 'expo-router' | 'react-navigation' | 'react-router' = 'react-router';
+      if (clean.includes('router.')) {
+        hint = 'expo-router';
+      } else if (clean.includes('navigation.')) {
+        hint = 'react-navigation';
+      }
+      return {
+        isNav: true,
+        frameworkHint: hint,
+      };
+    }
+
+    // 3. Link component href or to: <Link href="..." or <Link to="..."
+    if (/(?:href|to)\s*=\s*\{?\s*$/.test(clean)) {
+      const isTo = /\bto\s*=\s*\{?\s*$/.test(clean);
+      return { isNav: true, frameworkHint: isTo ? 'react-router' : 'expo-router' };
+    }
+
+    // 4. React Navigation nested screen: screen: "..."
+    if (/\bscreen\s*:\s*$/.test(clean)) {
+      return { isNav: true, frameworkHint: 'react-navigation' };
+    }
+
+    // 5. Stack.Navigator initialRouteName: initialRouteName="..."
+    if (/\binitialRouteName\s*=\s*\{?\s*$/.test(clean)) {
+      return { isNav: true, frameworkHint: 'react-navigation' };
+    }
+
+    // 6. Screen component name: <Stack.Screen name="..." or <Screen \n name=\n "..."
+    if (/<(?:[A-Za-z0-9]+\.)?Screen\b[\s\S]*?\bname\s*=\s*\{?\s*$/.test(clean)) {
+      return { isNav: true, frameworkHint: 'react-navigation' };
+    }
+
+    // 7. React Router Route path: <Route path="..." or <Route \n path=\n "..."
+    if (/<(?:[A-Za-z0-9]+\.)?Route\b[\s\S]*?\bpath\s*=\s*\{?\s*$/.test(clean)) {
+      return { isNav: true, frameworkHint: 'react-router' };
+    }
+
+    return { isNav: false };
+  }
+
+  /**
    * Find string literal at position in the document.
    */
   public static getStringLiteralAtPosition(
@@ -307,12 +397,10 @@ export class AstHelper {
         );
 
         const beforeString = lineText.substring(0, quoteStart);
-        let frameworkHint: 'expo-router' | 'react-navigation' | undefined;
-
-        if (/router\s*\.\s*(?:push|replace|navigate)/.test(beforeString) || /<Link[^>]*href=/.test(beforeString)) {
-          frameworkHint = 'expo-router';
-        } else if (/navigation\s*\.\s*(?:navigate|push|replace)/.test(beforeString)) {
-          frameworkHint = 'react-navigation';
+        let navContext = this.detectNavigationContext(beforeString);
+        if (!navContext.isNav) {
+          const precedingText = this.getPrecedingText(document, position.line, quoteStart);
+          navContext = this.detectNavigationContext(precedingText);
         }
 
         const isExpoLike = strContent.startsWith('/') || strContent.includes('/');
@@ -321,7 +409,7 @@ export class AstHelper {
           routeString: strContent,
           range,
           isExpoLike,
-          frameworkHint: frameworkHint || (isExpoLike ? 'expo-router' : 'react-navigation'),
+          frameworkHint: navContext.frameworkHint || (isExpoLike ? 'expo-router' : 'react-navigation'),
         };
       }
     }
@@ -340,15 +428,8 @@ export class AstHelper {
     const lineText = line.text;
     const results: RouteMatchInfo[] = [];
 
-    if (
-      !lineText.includes('navigate') &&
-      !lineText.includes('push') &&
-      !lineText.includes('replace') &&
-      !lineText.includes('router') &&
-      !lineText.includes('Link') &&
-      !lineText.includes('pathname') &&
-      !lineText.includes('Screen')
-    ) {
+    // Quick check: if the line doesn't contain any quotes, it can't contain a string literal
+    if (!lineText.includes("'") && !lineText.includes('"') && !lineText.includes('`')) {
       return results;
     }
 
@@ -359,20 +440,20 @@ export class AstHelper {
       const quoteStart = match.index;
       const strContent = match[2];
       const quoteEnd = quoteStart + match[0].length;
+
+      // First check context on the same line
       const beforeString = lineText.substring(0, quoteStart);
+      let navContext = this.detectNavigationContext(beforeString);
 
-      const isNavCall =
-        /(?:navigation|router)\s*\.\s*(?:navigate|push|replace)\s*\(\s*$/.test(beforeString) ||
-        /href=\s*$/.test(beforeString) ||
-        /pathname:\s*$/.test(beforeString) ||
-        /<(?:[A-Za-z0-9]+\.)?Screen[^>]*name=\s*$/.test(beforeString);
+      // If not detected on current line, check preceding text across lines
+      if (!navContext.isNav) {
+        const precedingText = this.getPrecedingText(document, lineNumber, quoteStart);
+        navContext = this.detectNavigationContext(precedingText);
+      }
 
-      if (isNavCall) {
+      if (navContext.isNav) {
         const isExpoLike = strContent.startsWith('/') || strContent.includes('/');
-        let frameworkHint: 'expo-router' | 'react-navigation' = isExpoLike ? 'expo-router' : 'react-navigation';
-        if (beforeString.includes('router') || beforeString.includes('href')) {
-          frameworkHint = 'expo-router';
-        }
+        const frameworkHint = navContext.frameworkHint || (isExpoLike ? 'expo-router' : 'react-navigation');
 
         results.push({
           routeString: strContent,
@@ -402,10 +483,36 @@ export class AstHelper {
     const textBeforeCursor = line.text.substring(0, position.character);
 
     // 1. Check if inside route name argument
-    const navCallMatch = /(?:navigation|router)\s*\.\s*(?:navigate|push|replace)\s*\(\s*(['"`]?)([^'"`]*)$/.exec(textBeforeCursor);
+    let navCallMatch = /(?:(?:\bnavigation|\brouter)\s*\.\s*(?:navigate|push|replace)|\bnavigate|\bredirect)\s*\(\s*(['"`]?)([^'"`]*)$/.exec(textBeforeCursor);
+    let linkHrefMatch = /<Link[^>]*href=\s*(['"`]?)([^'"`]*)$/.exec(textBeforeCursor);
+    let pathnameMatch = /pathname\s*:\s*(['"`]?)([^'"`]*)$/.exec(textBeforeCursor);
+
+    // If not matched on current line alone, look back across preceding lines
+    if (!navCallMatch && !linkHrefMatch && !pathnameMatch) {
+      const precedingText = this.getPrecedingText(document, position.line, position.character);
+      const cleanPreceding = precedingText
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/\/\/.*$/gm, '')
+        .trimEnd();
+
+      pathnameMatch = /pathname\s*:\s*(['"`]?)([^'"`\n]*)$/.exec(cleanPreceding);
+      if (!pathnameMatch) {
+        navCallMatch = /(?:(?:\bnavigation|\brouter)\s*\.\s*(?:navigate|push|replace)|\bnavigate|\bredirect)\s*\(\s*(['"`]?)([^'"`\n]*)$/.exec(cleanPreceding);
+      }
+      if (!pathnameMatch && !navCallMatch) {
+        linkHrefMatch = /<Link\b[\s\S]*?\bhref=\s*(['"`]?)([^'"`\n]*)$/.exec(cleanPreceding);
+      }
+    }
+
     if (navCallMatch) {
       const typed = navCallMatch[2];
       const isRouter = /router\s*\./.test(navCallMatch[0]);
+      const isNav = /navigation\s*\./.test(navCallMatch[0]);
+      const frameworkHint: 'expo-router' | 'react-navigation' | 'react-router' = isRouter
+        ? 'expo-router'
+        : isNav
+        ? 'react-navigation'
+        : 'react-router';
 
       const range = new vscode.Range(
         new vscode.Position(position.line, position.character - typed.length),
@@ -414,13 +521,11 @@ export class AstHelper {
 
       return {
         type: 'route-name',
-        frameworkHint: isRouter ? 'expo-router' : 'react-navigation',
+        frameworkHint,
         range,
       };
     }
 
-    // Expo Router Link: <Link href="..."
-    const linkHrefMatch = /<Link[^>]*href=\s*(['"`]?)([^'"`]*)$/.exec(textBeforeCursor);
     if (linkHrefMatch) {
       const typed = linkHrefMatch[2];
       const range = new vscode.Range(
@@ -434,8 +539,6 @@ export class AstHelper {
       };
     }
 
-    // Expo Router pathname: pathname: "..."
-    const pathnameMatch = /pathname\s*:\s*(['"`]?)([^'"`]*)$/.exec(textBeforeCursor);
     if (pathnameMatch) {
       const typed = pathnameMatch[2];
       const range = new vscode.Range(
@@ -450,7 +553,22 @@ export class AstHelper {
     }
 
     // 2. Check if inside params object!
-    const paramCallMatch = /(?:navigation|router)\s*\.\s*(?:navigate|push|replace)\s*\(\s*(['"`])([^'"`]+)\1\s*,\s*\{([^}]*)$/.exec(textBeforeCursor);
+    let paramCallMatch = /(?:navigation|router)\s*\.\s*(?:navigate|push|replace)\s*\(\s*(['"`])([^'"`]+)\1\s*,\s*\{([^}]*)$/.exec(textBeforeCursor);
+    let expoParamsMatch = /params\s*:\s*\{([^}]*)$/.exec(textBeforeCursor);
+
+    if (!paramCallMatch && !expoParamsMatch) {
+      const precedingText = this.getPrecedingText(document, position.line, position.character);
+      const cleanPreceding = precedingText
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/\/\/.*$/gm, '')
+        .trimEnd();
+
+      paramCallMatch = /(?:navigation|router)\s*\.\s*(?:navigate|push|replace)\s*\(\s*(['"`])([^'"`]+)\1\s*,\s*\{([^}]*)$/.exec(cleanPreceding);
+      if (!paramCallMatch) {
+        expoParamsMatch = /params\s*:\s*\{([^}]*)$/.exec(cleanPreceding);
+      }
+    }
+
     if (paramCallMatch) {
       const routeName = paramCallMatch[2];
       const isRouter = /router\s*\./.test(paramCallMatch[0]);
@@ -463,15 +581,8 @@ export class AstHelper {
       };
     }
 
-    // Check Expo object params: params: { | }
-    const expoParamsMatch = /params\s*:\s*\{([^}]*)$/.exec(textBeforeCursor);
     if (expoParamsMatch) {
-      const fullTextBefore = document.getText(
-        new vscode.Range(
-          new vscode.Position(Math.max(0, position.line - 5), 0),
-          position
-        )
-      );
+      const fullTextBefore = this.getPrecedingText(document, position.line, position.character, 15);
       const pathnameExtract = /pathname\s*:\s*(['"`])([^'"`]+)\1/.exec(fullTextBefore);
       const currentRouteName = pathnameExtract ? pathnameExtract[2] : undefined;
 

@@ -3,6 +3,7 @@ import { RouteManager } from '../src/routeManager';
 import { RouterCompletionProvider } from '../src/providers/completionProvider';
 import { RouterDefinitionProvider } from '../src/providers/definitionProvider';
 import { RouterHoverProvider } from '../src/providers/hoverProvider';
+import { RouterDocumentLinkProvider } from '../src/providers/documentLinkProvider';
 import { Position, Uri } from './vscodeMock';
 
 function createMockDocument(lineTexts: string[]) {
@@ -21,12 +22,14 @@ describe('Providers Test', () => {
   let completionProvider: RouterCompletionProvider;
   let definitionProvider: RouterDefinitionProvider;
   let hoverProvider: RouterHoverProvider;
+  let documentLinkProvider: RouterDocumentLinkProvider;
 
   beforeEach(() => {
     routeManager = new RouteManager();
     completionProvider = new RouterCompletionProvider(routeManager);
     definitionProvider = new RouterDefinitionProvider(routeManager);
     hoverProvider = new RouterHoverProvider(routeManager);
+    documentLinkProvider = new RouterDocumentLinkProvider(routeManager);
 
     // Mock some routes directly on routeManager for testing
     (routeManager as any).expoScanner.routes.set('/profile/settings', {
@@ -127,5 +130,36 @@ describe('Providers Test', () => {
     expect(hover).toBeDefined();
     expect(hover.contents.value).toContain('React Navigation: `UserProfile`');
     expect(hover.contents.value).toContain('UserProfileScreen');
+  });
+
+  it('provides document links when path is on same line', () => {
+    const doc = createMockDocument([
+      'router.navigate({',
+      '  pathname: "/profile/settings",',
+      '});',
+    ]);
+
+    const links = documentLinkProvider.provideDocumentLinks(doc, {} as any) as any[];
+    expect(links).toBeDefined();
+    expect(links).toHaveLength(1);
+    expect(links[0].range.start.line).toBe(1);
+    expect(links[0].target.path).toBe('/workspace/app/profile/settings.tsx');
+  });
+
+  it('provides document links when path is on next line (multiline pathname)', () => {
+    const doc = createMockDocument([
+      'router.navigate({',
+      '  pathname:',
+      '    "/profile/settings",',
+      '  params: { tab: "general" },',
+      '});',
+    ]);
+
+    const links = documentLinkProvider.provideDocumentLinks(doc, {} as any) as any[];
+    expect(links).toBeDefined();
+    expect(links).toHaveLength(1);
+    expect(links[0].range.start.line).toBe(2);
+    expect(links[0].range.start.character).toBe(5);
+    expect(links[0].target.path).toBe('/workspace/app/profile/settings.tsx');
   });
 });

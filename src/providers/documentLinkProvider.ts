@@ -32,7 +32,7 @@ export class RouterDocumentLinkProvider implements vscode.DocumentLinkProvider {
           });
 
           const link = new vscode.DocumentLink(m.range, targetUri);
-          link.tooltip = `Router Goto: Open ${route.framework === 'expo-router' ? 'Expo Route' : 'Screen Component'} (${vscode.workspace.asRelativePath(route.fileUri)})`;
+          link.tooltip = `Router Goto: Open ${route.framework === 'expo-router' ? 'Expo Route' : route.framework === 'react-router' ? 'React Router Component' : 'Screen Component'} (${vscode.workspace.asRelativePath(route.fileUri)})`;
           links.push(link);
         }
       }

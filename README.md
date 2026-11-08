@@ -6,7 +6,7 @@
 <p align="center"><code>vscode-router-goto</code></p>
 
 <p align="center">
-  <a href="https://marketplace.visualstudio.com"><img src="https://img.shields.io/badge/version-0.2.0-blue.svg" alt="Version"></a>
+  <a href="https://marketplace.visualstudio.com"><img src="https://img.shields.io/badge/version-0.2.1-blue.svg" alt="Version"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://code.visualstudio.com/"><img src="https://img.shields.io/badge/VS%20Code-^1.80.0-007ACC.svg" alt="VS Code"></a>
 </p>

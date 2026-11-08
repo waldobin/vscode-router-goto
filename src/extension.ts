@@ -35,8 +35,9 @@ export async function activate(context: vscode.ExtensionContext) {
     const routes = routeManager.getAllRoutes();
     const expoCount = routeManager.getExpoRoutes().length;
     const reactNavCount = routeManager.getReactNavRoutes().length;
+    const reactRouterCount = routeManager.getReactRouterRoutes().length;
     statusBarItem.text = `$(compass) ${routes.length} Routes`;
-    statusBarItem.tooltip = `Router Goto:\n- ${expoCount} Expo Routes\n- ${reactNavCount} React Navigation Screens\nClick to view all routes`;
+    statusBarItem.tooltip = `Router Goto:\n- ${expoCount} Expo Routes\n- ${reactNavCount} React Navigation Screens\n- ${reactRouterCount} React Router Routes\nClick to view all routes`;
     statusBarItem.show();
   };
 

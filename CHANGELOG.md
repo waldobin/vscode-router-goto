@@ -2,6 +2,17 @@
 
 All notable changes to the "vscode-router-goto" extension will be documented in this file.
 
+## [0.2.1] - Multiline Paths & React Router DOM Support
+
+- 🐛 **Fix Multiline Route Underline (Issue #1):**
+  - Route strings on a new line (e.g. `pathname:\n "/path"`, `router.push(\n "/path")`, or `navigate(\n "/path")`) are now properly underlined and clickable.
+  - Context detection looks backwards across lines, skipping comments and whitespace.
+- 🌐 **React Router DOM Support (`react-router-dom`):**
+  - Automatically scan JSX `<Route path="..." element={<Component />} />` and `createBrowserRouter` routes.
+  - Automatically unwraps Higher-Order Components and Route Guards (e.g. `<ProtectedSearch><Page /></ProtectedSearch>`) to find the target component.
+  - Resolves path aliases from `tsconfig.json` / `tsconfig.paths.json` (e.g. `@pages/...`, `@/...`).
+  - Full support for bare `navigate(...)`, `redirect(...)`, and `<Link to="..." />`.
+
 ## [0.2.0] - Nested Navigation & Enum Support
 
 - 🧭 **Click on `navigation.navigate(...)` Directly:**

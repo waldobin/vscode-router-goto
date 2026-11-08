@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-export type FrameworkType = 'expo-router' | 'react-navigation';
+export type FrameworkType = 'expo-router' | 'react-navigation' | 'react-router';
 
 export interface RouteParam {
   name: string;

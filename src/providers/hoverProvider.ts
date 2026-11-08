@@ -63,6 +63,23 @@ export class RouterHoverProvider implements vscode.HoverProvider {
             );
           }
         }
+      } else if (route.framework === 'react-router') {
+        md.appendMarkdown(`### 🌐 React Router: \`${route.name}\`\n\n`);
+
+        if (route.componentName) {
+          md.appendMarkdown(`🧩 **Component:** \`${route.componentName}\`\n\n`);
+        }
+
+        md.appendMarkdown(`📂 **Screen Component:** [${relPath}](${route.fileUri.toString()})\n\n`);
+
+        if (route.params.length > 0) {
+          md.appendMarkdown(`**URL Parameters:**\n\n`);
+          for (const p of route.params) {
+            md.appendMarkdown(
+              `- **\`${p.name}\`** (\`${p.type}\`, ${p.required ? '**required**' : '*optional*'}): ${p.description || ''}\n`
+            );
+          }
+        }
       } else {
         md.appendMarkdown(`### 🧭 React Navigation: \`${route.name}\`\n\n`);
 

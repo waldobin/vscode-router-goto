@@ -1,11 +1,13 @@
 import * as vscode from 'vscode';
 import { ExpoScanner } from './expo/expoScanner';
 import { ReactNavScanner } from './reactNavigation/reactNavScanner';
+import { ReactRouterScanner } from './reactRouter/reactRouterScanner';
 import { RouteDefinition } from './types';
 
 export class RouteManager implements vscode.Disposable {
   private expoScanner: ExpoScanner;
   private reactNavScanner: ReactNavScanner;
+  private reactRouterScanner: ReactRouterScanner;
   private fileWatcher?: vscode.FileSystemWatcher;
   private disposables: vscode.Disposable[] = [];
   private onRoutesUpdatedEmitter = new vscode.EventEmitter<void>();
@@ -16,6 +18,7 @@ export class RouteManager implements vscode.Disposable {
   constructor() {
     this.expoScanner = new ExpoScanner();
     this.reactNavScanner = new ReactNavScanner();
+    this.reactRouterScanner = new ReactRouterScanner();
     this.setupFileWatcher();
   }
 
@@ -33,6 +36,7 @@ export class RouteManager implements vscode.Disposable {
       const config = vscode.workspace.getConfiguration('routerGoto');
       const enableExpo = config.get('enableExpoRouter', true);
       const enableReactNav = config.get('enableReactNavigation', true);
+      const enableReactRouter = config.get('enableReactRouter', true);
 
       const promises: Promise<any>[] = [];
 
@@ -41,6 +45,9 @@ export class RouteManager implements vscode.Disposable {
       }
       if (enableReactNav) {
         promises.push(this.reactNavScanner.scanWorkspace());
+      }
+      if (enableReactRouter) {
+        promises.push(this.reactRouterScanner.scanWorkspace());
       }
 
       await Promise.all(promises);
@@ -65,6 +72,7 @@ export class RouteManager implements vscode.Disposable {
     watcher.onDidDelete((uri) => {
       this.expoScanner.removeFile(uri);
       this.reactNavScanner.removeFile(uri);
+      this.reactRouterScanner.removeFile(uri);
       this.onRoutesUpdatedEmitter.fire();
     });
 
@@ -81,6 +89,7 @@ export class RouteManager implements vscode.Disposable {
     const config = vscode.workspace.getConfiguration('routerGoto');
     const enableExpo = config.get('enableExpoRouter', true);
     const enableReactNav = config.get('enableReactNavigation', true);
+    const enableReactRouter = config.get('enableReactRouter', true);
 
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
     if (!workspaceFolder) {
@@ -98,6 +107,10 @@ export class RouteManager implements vscode.Disposable {
       await this.reactNavScanner.processFile(uri);
     }
 
+    if (enableReactRouter) {
+      await this.reactRouterScanner.processFile(uri);
+    }
+
     this.onRoutesUpdatedEmitter.fire();
   }
 
@@ -105,6 +118,7 @@ export class RouteManager implements vscode.Disposable {
     const config = vscode.workspace.getConfiguration('routerGoto');
     const enableExpo = config.get('enableExpoRouter', true);
     const enableReactNav = config.get('enableReactNavigation', true);
+    const enableReactRouter = config.get('enableReactRouter', true);
 
     const results: RouteDefinition[] = [];
     if (enableExpo) {
@@ -112,6 +126,9 @@ export class RouteManager implements vscode.Disposable {
     }
     if (enableReactNav) {
       results.push(...this.reactNavScanner.getRoutes());
+    }
+    if (enableReactRouter) {
+      results.push(...this.reactRouterScanner.getRoutes());
     }
     return results;
   }
@@ -124,18 +141,28 @@ export class RouteManager implements vscode.Disposable {
     return this.reactNavScanner.getRoutes();
   }
 
+  public getReactRouterRoutes(): RouteDefinition[] {
+    return this.reactRouterScanner.getRoutes();
+  }
+
   public findRoute(nameOrPath: string): RouteDefinition | undefined {
-    // Check Expo routes first if it looks like a path (starts with / or has /)
+    // 1. Check Expo routes first if it looks like a path (starts with / or has /)
     if (nameOrPath.startsWith('/') || nameOrPath.includes('/')) {
       const expo = this.expoScanner.findRoute(nameOrPath);
       if (expo) return expo;
+      const reactRouter = this.reactRouterScanner.findRoute(nameOrPath);
+      if (reactRouter) return reactRouter;
     }
 
-    // Check React Navigation
+    // 2. Check React Navigation
     const reactNav = this.reactNavScanner.findRoute(nameOrPath);
     if (reactNav) return reactNav;
 
-    // Fallback Expo search without leading slash
+    // 3. Fallback React Router search
+    const reactRouter = this.reactRouterScanner.findRoute(nameOrPath);
+    if (reactRouter) return reactRouter;
+
+    // 4. Fallback Expo search without leading slash
     return this.expoScanner.findRoute(nameOrPath);
   }
 
@@ -143,6 +170,7 @@ export class RouteManager implements vscode.Disposable {
     this.disposables.forEach((d) => d.dispose());
     this.expoScanner.dispose();
     this.reactNavScanner.dispose();
+    this.reactRouterScanner.dispose();
     this.onRoutesUpdatedEmitter.dispose();
   }
 }

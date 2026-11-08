@@ -2,7 +2,7 @@
   "name": "vscode-router-goto",
   "displayName": "React Navigation & Expo Router IntelliSense",
   "description": "Smart autocomplete, Click-to-Definition (Cmd+click) and hover documentation for Expo Router & React Navigation screens and params.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "waldoxbin",
   "icon": "assets/icon.png",
   "engines": {
@@ -65,6 +65,11 @@
           "type": "boolean",
           "default": true,
           "description": "Enable React Navigation scanning (ParamList & Stack.Screen), autocomplete, and navigation."
+        },
+        "routerGoto.enableReactRouter": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable React Router (react-router-dom) scanning (<Route> & createBrowserRouter), autocomplete, and navigation."
         },
         "routerGoto.appDirectories": {
           "type": "array",

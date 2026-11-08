@@ -43,6 +43,23 @@ export class Location {
   constructor(public uri: Uri, public range: Range) {}
 }
 
+export class DocumentLink {
+  public tooltip?: string;
+  constructor(public range: Range, public target?: Uri) {}
+}
+
+export enum DiagnosticSeverity {
+  Error = 0,
+  Warning = 1,
+  Information = 2,
+  Hint = 3,
+}
+
+export class Diagnostic {
+  public source?: string;
+  constructor(public range: Range, public message: string, public severity?: DiagnosticSeverity) {}
+}
+
 export enum CompletionItemKind {
   Property = 9,
   Folder = 18,
